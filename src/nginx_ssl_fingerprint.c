@@ -209,8 +209,12 @@ int ngx_ssl_ja3(ngx_connection_t *c)
         return NGX_OK;
     }
 
+
+    c->ssl->fp_ja3_str.data = ngx_pnalloc(c->pool, c->ssl->fp_ja3_data.len * 3);
+    if (c->ssl->fp_ja3_str.data == NULL) {
+        return NGX_DECLINED;
+    }
     c->ssl->fp_ja3_str.len = c->ssl->fp_ja3_data.len * 3;
-    c->ssl->fp_ja3_str.data = ngx_pnalloc(c->pool, c->ssl->fp_ja3_str.len);
 
     ngx_log_debug(NGX_LOG_DEBUG_EVENT, c->log, 0, "ngx_ssl_ja3: alloc bytes: [%d]\n", c->ssl->fp_ja3_str.len);
 
@@ -311,8 +315,12 @@ int ngx_ssl_ja3_hash(ngx_connection_t *c)
         return NGX_DECLINED;
     }
 
+
+    c->ssl->fp_ja3_hash.data = ngx_pnalloc(c->pool, 32);
+    if (c->ssl->fp_ja3_hash.data == NULL) {
+        return NGX_DECLINED;
+    }
     c->ssl->fp_ja3_hash.len = 32;
-    c->ssl->fp_ja3_hash.data = ngx_pnalloc(c->pool, c->ssl->fp_ja3_hash.len);
 
     ngx_log_debug(NGX_LOG_DEBUG_EVENT, c->log, 0, "ngx_ssl_ja3_hash: alloc bytes: [%d]\n", c->ssl->fp_ja3_hash.len);
 
@@ -343,6 +351,10 @@ int ngx_http2_fingerprint(ngx_connection_t *c, ngx_http_v2_connection_t *h2c)
 
     n = 4 + h2c->fp_settings.len * 3 + 10 + h2c->fp_priorities.len * 2 + h2c->fp_pseudoheaders.len * 2;
     h2c->fp_str.data = ngx_pnalloc(c->pool, n);
+    if (h2c->fp_str.data == NULL) {
+        return NGX_DECLINED;
+    }
+
     pstr = h2c->fp_str.data;
 
     ngx_log_debug(NGX_LOG_DEBUG_EVENT, c->log, 0, "ngx_http2_fingerprint: alloc bytes: [%d]\n", n);

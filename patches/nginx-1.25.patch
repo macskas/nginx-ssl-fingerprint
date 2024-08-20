@@ -1,8 +1,7 @@
-diff --git a/src/event/ngx_event_openssl.c b/src/event/ngx_event_openssl.c
-index 89f277fe5..d0e8558bb 100644
---- a/src/event/ngx_event_openssl.c
-+++ b/src/event/ngx_event_openssl.c
-@@ -1793,6 +1793,29 @@ ngx_ssl_set_session(ngx_connection_t *c, ngx_ssl_session_t *session)
+diff '--exclude=.idea' '--exclude=CMakeLists.txt' '--exclude=cmake-build-debug' -Nru a/src/event/ngx_event_openssl.c b/src/event/ngx_event_openssl.c
+--- a/src/event/ngx_event_openssl.c	2023-10-24 15:46:47.000000000 +0200
++++ b/src/event/ngx_event_openssl.c	2024-06-12 11:44:31.534996421 +0200
+@@ -1792,6 +1792,35 @@
      return NGX_OK;
  }
  
@@ -10,19 +9,25 @@ index 89f277fe5..d0e8558bb 100644
 +ngx_ssl_client_hello_ja3_cb(SSL *s, int *al, void *arg) {
 +    ngx_connection_t  *c = arg;
 +
-+    if (c == NULL) {
++    if (c == NULL || c->pool == NULL) {
 +        return 1;
 +    }
 +
-+    if (c->ssl == NULL) {
++    if (c->ssl == NULL || c->ssl->connection == NULL) {
 +        return 1;
 +    }
 +
 +    c->ssl->fp_ja3_data.len = SSL_client_hello_get_ja3_data(c->ssl->connection, NULL);
-+
++    if (c->ssl->fp_ja3_data.len == 0) {
++        return 1;
++    }
 +    ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0, "ngx_ssl_client_hello_ja3_cb: alloc %d bytes", c->ssl->fp_ja3_data.len);
 +
 +    c->ssl->fp_ja3_data.data = ngx_pnalloc(c->pool, c->ssl->fp_ja3_data.len);
++    if (c->ssl->fp_ja3_data.data == NULL) {
++        c->ssl->fp_ja3_data.len = 0;
++        return 1;
++    }
 +    c->ssl->fp_ja3_data.len = SSL_client_hello_get_ja3_data(c->ssl->connection, c->ssl->fp_ja3_data.data);
 +
 +    ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0, "ngx_ssl_client_hello_ja3_cb: used %d bytes", c->ssl->fp_ja3_data.len);
@@ -32,7 +37,7 @@ index 89f277fe5..d0e8558bb 100644
  
  ngx_int_t
  ngx_ssl_handshake(ngx_connection_t *c)
-@@ -1813,6 +1836,8 @@ ngx_ssl_handshake(ngx_connection_t *c)
+@@ -1812,6 +1841,8 @@
  
      ngx_ssl_clear_error(c->log);
  
@@ -41,11 +46,10 @@ index 89f277fe5..d0e8558bb 100644
      n = SSL_do_handshake(c->ssl->connection);
  
      ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0, "SSL_do_handshake: %d", n);
-diff --git a/src/event/ngx_event_openssl.h b/src/event/ngx_event_openssl.h
-index ebb2c35bf..b075c2cf3 100644
---- a/src/event/ngx_event_openssl.h
-+++ b/src/event/ngx_event_openssl.h
-@@ -128,6 +128,11 @@ struct ngx_ssl_connection_s {
+diff '--exclude=.idea' '--exclude=CMakeLists.txt' '--exclude=cmake-build-debug' -Nru a/src/event/ngx_event_openssl.h b/src/event/ngx_event_openssl.h
+--- a/src/event/ngx_event_openssl.h	2023-10-24 15:46:47.000000000 +0200
++++ b/src/event/ngx_event_openssl.h	2024-05-15 09:28:10.787188588 +0200
+@@ -128,6 +128,11 @@
      unsigned                    in_ocsp:1;
      unsigned                    early_preread:1;
      unsigned                    write_blocked:1;
@@ -57,30 +61,45 @@ index ebb2c35bf..b075c2cf3 100644
  };
  
  
-diff --git a/src/http/v2/ngx_http_v2.c b/src/http/v2/ngx_http_v2.c
-index 0f5bd3de8..aae8ec9d6 100644
---- a/src/http/v2/ngx_http_v2.c
-+++ b/src/http/v2/ngx_http_v2.c
-@@ -301,6 +301,14 @@ ngx_http_v2_init(ngx_event_t *rev)
-         ngx_add_timer(rev, cscf->client_header_timeout);
+diff '--exclude=.idea' '--exclude=CMakeLists.txt' '--exclude=cmake-build-debug' -Nru a/src/http/v2/ngx_http_v2.c b/src/http/v2/ngx_http_v2.c
+--- a/src/http/v2/ngx_http_v2.c	2023-10-24 15:46:47.000000000 +0200
++++ b/src/http/v2/ngx_http_v2.c	2024-06-12 11:57:09.437997099 +0200
+@@ -284,6 +284,22 @@
+         return;
      }
  
 +    h2c->fp_fingerprinted = 0;
++
 +    h2c->fp_settings.data = ngx_pnalloc(c->pool, 32);
 +    h2c->fp_settings.len = 0;
++
 +    h2c->fp_priorities.data = ngx_pnalloc(c->pool, 32);
 +    h2c->fp_priorities.len = 0;
++
 +    h2c->fp_pseudoheaders.data = ngx_pnalloc(c->pool, 32);
 +    h2c->fp_pseudoheaders.len = 0;
++
++    if (h2c->fp_settings.data == NULL || h2c->fp_priorities.data == NULL || h2c->fp_pseudoheaders.data == NULL) {
++        ngx_http_close_connection(c);
++        return;
++    }
++
+     h2c->state.handler = ngx_http_v2_state_preface;
+ 
+     ngx_queue_init(&h2c->waiting);
+@@ -301,6 +317,7 @@
+         ngx_add_timer(rev, cscf->client_header_timeout);
+     }
+ 
 +
      c->idle = 1;
      ngx_reusable_connection(c, 0);
  
-@@ -1352,6 +1360,14 @@ ngx_http_v2_state_headers(ngx_http_v2_connection_t *h2c, u_char *pos,
+@@ -1352,6 +1369,14 @@
          }
      }
  
-+    if (!h2c->fp_fingerprinted && h2c->fp_priorities.len < 32) {
++    if (!h2c->fp_fingerprinted && h2c->fp_priorities.len < 32 && h2c->fp_priorities.data != NULL && stream->node->id != NULL) {
 +        h2c->fp_priorities.data[h2c->fp_priorities.len] = (uint8_t)stream->node->id;
 +        h2c->fp_priorities.data[h2c->fp_priorities.len+1] = (uint8_t)excl;
 +        h2c->fp_priorities.data[h2c->fp_priorities.len+2] = (uint8_t)depend;
@@ -91,21 +110,22 @@ index 0f5bd3de8..aae8ec9d6 100644
      return ngx_http_v2_state_header_block(h2c, pos, end);
  
  rst_stream:
-@@ -1775,6 +1791,9 @@ ngx_http_v2_state_process_header(ngx_http_v2_connection_t *h2c, u_char *pos,
-     }
+@@ -1782,6 +1807,10 @@
+                            "http2 header: \":%V: %V\"",
+                            &header->name, &header->value);
  
-     if (header->name.data[0] == ':') {
-+        if (!h2c->fp_fingerprinted && h2c->fp_pseudoheaders.len < 32 && header->name.len > 1)
-+            h2c->fp_pseudoheaders.data[h2c->fp_pseudoheaders.len++] = header->name.data[1];
++            if (!h2c->fp_fingerprinted && h2c->fp_pseudoheaders.len < 32 && header->name.len > 1 && h2c->fp_pseudoheaders.data != NULL) {
++                h2c->fp_pseudoheaders.data[h2c->fp_pseudoheaders.len++] = header->name.data[1];
++            }
 +
-         rc = ngx_http_v2_pseudo_header(r, header);
+             return ngx_http_v2_state_header_complete(h2c, pos, end);
+         }
  
-         if (rc == NGX_OK) {
-@@ -2194,6 +2213,12 @@ ngx_http_v2_state_settings_params(ngx_http_v2_connection_t *h2c, u_char *pos,
+@@ -2194,6 +2223,12 @@
          ngx_log_debug2(NGX_LOG_DEBUG_HTTP, h2c->connection->log, 0,
                         "http2 setting %ui:%ui", id, value);
  
-+        if (!h2c->fp_fingerprinted && h2c->fp_settings.len < 32) {
++        if (!h2c->fp_fingerprinted && h2c->fp_settings.len < (32-5) && h2c->fp_settings.data != NULL) {
 +            h2c->fp_settings.data[h2c->fp_settings.len] = (uint8_t)id;
 +            *(uint32_t*)(h2c->fp_settings.data + h2c->fp_settings.len + 1)  = (uint32_t)value;
 +            h2c->fp_settings.len += 5;
@@ -114,7 +134,7 @@ index 0f5bd3de8..aae8ec9d6 100644
          switch (id) {
  
          case NGX_HTTP_V2_INIT_WINDOW_SIZE_SETTING:
-@@ -2478,6 +2503,9 @@ ngx_http_v2_state_window_update(ngx_http_v2_connection_t *h2c, u_char *pos,
+@@ -2478,6 +2513,9 @@
      }
  
      h2c->send_window += window;
@@ -124,11 +144,10 @@ index 0f5bd3de8..aae8ec9d6 100644
  
      while (!ngx_queue_empty(&h2c->waiting)) {
          q = ngx_queue_head(&h2c->waiting);
-diff --git a/src/http/v2/ngx_http_v2.h b/src/http/v2/ngx_http_v2.h
-index 6751b3026..d519092dd 100644
---- a/src/http/v2/ngx_http_v2.h
-+++ b/src/http/v2/ngx_http_v2.h
-@@ -168,6 +168,13 @@ struct ngx_http_v2_connection_s {
+diff '--exclude=.idea' '--exclude=CMakeLists.txt' '--exclude=cmake-build-debug' -Nru a/src/http/v2/ngx_http_v2.h b/src/http/v2/ngx_http_v2.h
+--- a/src/http/v2/ngx_http_v2.h	2023-10-24 15:46:47.000000000 +0200
++++ b/src/http/v2/ngx_http_v2.h	2024-05-15 09:28:10.787188588 +0200
+@@ -168,6 +168,13 @@
      unsigned                         table_update:1;
      unsigned                         blocked:1;
      unsigned                         goaway:1;
