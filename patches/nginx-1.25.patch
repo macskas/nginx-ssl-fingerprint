@@ -99,7 +99,7 @@ diff '--exclude=.idea' '--exclude=CMakeLists.txt' '--exclude=cmake-build-debug' 
          }
      }
  
-+    if (!h2c->fp_fingerprinted && h2c->fp_priorities.len < 32 && h2c->fp_priorities.data != NULL && stream->node->id != NULL) {
++    if (!h2c->fp_fingerprinted && h2c->fp_priorities.len < 32 && h2c->fp_priorities.data != NULL) {
 +        h2c->fp_priorities.data[h2c->fp_priorities.len] = (uint8_t)stream->node->id;
 +        h2c->fp_priorities.data[h2c->fp_priorities.len+1] = (uint8_t)excl;
 +        h2c->fp_priorities.data[h2c->fp_priorities.len+2] = (uint8_t)depend;
